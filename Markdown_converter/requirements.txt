@@ -1,0 +1,5 @@
+requests==2.31.0         # For fetching webpage content
+beautifulsoup4==4.12.2   # For parsing and extracting main content
+markdownify==0.10.1      # For converting HTML to Markdown
+Flask==2.2.5             # for HTML and python interaction
+unidecode==1.3.8         #unicode error
