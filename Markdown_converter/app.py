@@ -5,6 +5,7 @@ import markdownify
 import os
 from datetime import datetime
 import urllib.parse
+import re
 
 app = Flask(__name__)
 ATTACHMENTS_FOLDER = "attachments"
@@ -48,86 +49,49 @@ def index():
 
     return render_template("index.html")
 
-''' def download_images_and_update_links(main_content, markdown_content):
-    # Find all image tags and download images
-    for img_tag in main_content.find_all("img"):
-        img_url = img_tag.get("src")
-        if img_url.startswith("//"):
-            img_url = "https:" + img_url
-        elif img_url.startswith("/"):
-            img_url = request.form.get("url").split("/")[2] + img_url  # Relative path to absolute
+# This code is modified according to obsidian flavoured markdown
+# Now also supports the gif as well as the video files
+def download_media_and_update_links(main_content, markdown_content):
+    # Download images and update Markdown links
+    for media_tag in main_content.find_all(['img', 'video']):
+        if media_tag.name == 'img':
+            media_url = media_tag.get("src")
+            media_type = 'image'
+        elif media_tag.name == 'video':
+            media_url = media_tag.find("source").get("src") if media_tag.find("source") else media_tag.get("src")
+            media_type = 'video'
 
-        img_data = requests.get(img_url).content
-        img_name = os.path.join(ATTACHMENTS_FOLDER, os.path.basename(img_url))
-        
-        # Save image to attachments folder
-        with open(img_name, "wb") as img_file:
-            img_file.write(img_data)
+        # Normalize the media URL
+        if media_url.startswith("//"):
+            media_url = "https:" + media_url
+        elif media_url.startswith("/"):
+            media_url = request.form.get("url").split("/")[2] + media_url  # Convert relative to absolute
 
-        # Update image links in Markdown to point to the attachments folder
-        markdown_content = markdown_content.replace(img_tag["src"], f"{ATTACHMENTS_FOLDER}/{os.path.basename(img_url)}")
-    
-    return markdown_content
-'''
-import re
+        # Sanitize the media URL to create a safe filename
+        media_name = os.path.basename(media_url)
+        media_name = re.sub(r'[<>:"/\\|?*\x00-\x1F]', '_', media_name)  # Replace illegal characters
 
-''' def download_images_and_update_links(main_content, markdown_content):
-    # Find all image tags and download images
-    for img_tag in main_content.find_all("img"):
-        img_url = img_tag.get("src")
-        if img_url.startswith("//"):
-            img_url = "https:" + img_url
-        elif img_url.startswith("/"):
-            img_url = request.form.get("url").split("/")[2] + img_url  # Relative path to absolute
+        media_path = os.path.join(ATTACHMENTS_FOLDER, media_name)
 
-        # Sanitize the image URL to create a safe filename
-        img_name = os.path.basename(img_url)
-        img_name = re.sub(r'[<>:"/\\|?*\x00-\x1F]', '_', img_name)  # Replace illegal characters with '_'
-        
-        img_path = os.path.join(ATTACHMENTS_FOLDER, img_name)
-        
-        # Download and save the image to the attachments folder
-        img_data = requests.get(img_url).content
-        with open(img_path, "wb") as img_file:
-            img_file.write(img_data)
-
-        # Update image links in Markdown to point to the attachments folder
-        markdown_content = markdown_content.replace(img_tag["src"], f"{ATTACHMENTS_FOLDER}/{img_name}")
-    
-    return markdown_content
-'''
-
-# Attachments are not downloading
-def download_images_and_update_links(main_content, markdown_content):
-    # Find all image tags and download images
-    for img_tag in main_content.find_all("img"):
-        img_url = img_tag.get("src")
-        
-        # Normalize the image URL
-        if img_url.startswith("//"):
-            img_url = "https:" + img_url
-        elif img_url.startswith("/"):
-            img_url = request.form.get("url").split("/")[2] + img_url  # Convert relative to absolute
-
-        # Sanitize the image URL to create a safe filename
-        img_name = os.path.basename(img_url)
-        img_name = re.sub(r'[<>:"/\\|?*\x00-\x1F]', '_', img_name)  # Replace illegal characters
-
-        img_path = os.path.join(ATTACHMENTS_FOLDER, img_name)
-        
-        # Download and save the image to the attachments folder
+        # Download and save the media to the attachments folder
         try:
-            img_data = requests.get(img_url).content
-            with open(img_path, "wb") as img_file:
-                img_file.write(img_data)
+            media_data = requests.get(media_url).content
+            with open(media_path, "wb") as media_file:
+                media_file.write(media_data)
         except Exception as e:
-            print(f"Error downloading {img_url}: {e}")
-            continue  # Skip this image if there's an error
+            print(f"Error downloading {media_url}: {e}")
+            continue  # Skip this media if there's an error
 
-        # Update image links in Markdown to point to the attachments folder
-        markdown_content = markdown_content.replace(img_tag["src"], f"{ATTACHMENTS_FOLDER}/{img_name}")
-    
+        # Update media links in Markdown for Obsidian
+        if media_type == 'image':
+            # Use the ![[filename]] syntax for embedding images in Obsidian
+            markdown_content = markdown_content.replace(media_tag["src"], f"![{media_name}]({ATTACHMENTS_FOLDER}/{media_name})")
+        elif media_type == 'video':
+            # Use the normal link syntax for videos
+            markdown_content = markdown_content.replace(media_tag["src"], f"[{media_name}]({ATTACHMENTS_FOLDER}/{media_name})")
+
     return markdown_content
+
 
 if __name__ == "__main__":
     app.run(debug=True)
