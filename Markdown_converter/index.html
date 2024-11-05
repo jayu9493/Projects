@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Converter</title>
+</head>
+<body>
+    <h1>Convert Webpage to Markdown</h1>
+    <form id="urlForm">
+        <input type="text" name="url" placeholder="Enter URL here" required>
+        <button type="submit">Convert</button>
+    </form>
+    <div id="progress"></div>
+    <script>
+        document.getElementById('urlForm').onsubmit = function(event) {
+            event.preventDefault();
+            const url = event.target.url.value;
+            const progressDiv = document.getElementById('progress');
+            progressDiv.innerText = 'Starting conversion...';
+
+            fetch('/start_conversion', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ url })
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'converted_page.md';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                progressDiv.innerText = 'Conversion complete! File downloaded.';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                progressDiv.innerText = 'Error during conversion: ' + error.message;
+            });
+        };
+    </script>
+</body>
+</html>
